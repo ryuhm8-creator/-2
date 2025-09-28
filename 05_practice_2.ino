@@ -19,7 +19,7 @@ while(count<5) {
 }
 void loop() {
   digitalWrite(7, LOW); 
-  while(true);
+  while(false);
 }
 }
 
