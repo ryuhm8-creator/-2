@@ -17,10 +17,6 @@ while(count<5) {
   count++;
 
 }
-void loop() {
   digitalWrite(7, LOW); 
   while(false);
 }
-}
-
-# 
