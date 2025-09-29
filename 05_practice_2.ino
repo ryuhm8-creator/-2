@@ -17,6 +17,6 @@ while(count<5) {
   count++;
 
 }
-  digitalWrite(7, LOW); 
-  while(false);
+  digitalWrite(7, HIGH); 
+  while(true);
 }
