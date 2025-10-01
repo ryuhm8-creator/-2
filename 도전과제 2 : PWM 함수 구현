@@ -1,0 +1,38 @@
+int led = 7; // LED 핀
+unsigned long period = 1000; // 삼각형 파형 주기 (ms)
+int duty_steps = 100; // 밝기 단계 (0~100)
+
+void set_period(unsigned long new_period) {
+  period = new_period;
+}
+
+void set_duty(int steps) {
+  duty_steps = steps;
+  if (duty_steps < 1) duty_steps = 1;
+  if (duty_steps > 100) duty_steps = 100;
+}
+
+void setup() {
+  pinMode(led, OUTPUT);
+  set_period(1000); // 1초 주기
+  set_duty(100);    // 101단계 (0~100)
+}
+
+void loop() {
+  unsigned long t = millis() % period;
+  int step;
+  if (t < period / 2) {
+    step = (t * duty_steps) / (period / 2); // 0~100까지 증가
+  } else {
+    step = duty_steps - ((t - period / 2) * duty_steps) / (period / 2); // 100~0까지 감소
+  }
+
+  // PWM 직접 구현: 한 단계마다 ON/OFF 시간 조절
+  int on_time = (step * (period / duty_steps)) / duty_steps; // 밝기 비율에 따라 ON 시간 계산
+  int off_time = ((duty_steps - step) * (period / duty_steps)) / duty_steps; // 나머지 OFF 시간
+
+  digitalWrite(led, HIGH);
+  delay(on_time); // 켜짐
+  digitalWrite(led, LOW);
+  delay(off_time); // 꺼짐
+}
