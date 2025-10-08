@@ -1,0 +1,84 @@
+// Arduino pin assignment
+#define PIN_LED  9
+#define PIN_TRIG 12   // sonar sensor TRIGGER
+#define PIN_ECHO 13   // sonar sensor ECHO
+
+// configurable parameters
+#define SND_VEL 346.0     // sound velocity at 24 celsius degree (unit: m/sec)
+#define INTERVAL 25      // sampling interval (unit: msec)
+#define PULSE_DURATION 10 // ultra-sound Pulse Duration (unit: usec)
+#define _DIST_MIN 100.0   // minimum distance to be measured (unit: mm)
+#define _DIST_MAX 300.0   // maximum distance to be measured (unit: mm)
+
+#define TIMEOUT ((INTERVAL / 2) * 1000.0) // maximum echo waiting time (unit: usec)
+#define SCALE (0.001 * 0.5 * SND_VEL) // coefficent to convert duration to distance
+
+unsigned long last_sampling_time;   // unit: msec
+
+void setup() {
+  // initialize GPIO pins
+  pinMode(PIN_LED, OUTPUT);
+  pinMode(PIN_TRIG, OUTPUT);  // sonar TRIGGER
+  pinMode(PIN_ECHO, INPUT);   // sonar ECHO
+  digitalWrite(PIN_TRIG, LOW);  // turn-off Sonar 
+  
+  // initialize serial port
+  Serial.begin(57600);
+}
+
+void loop() { 
+  float distance;
+
+  // wait until next sampling time. // polling
+  // millis() returns the number of milliseconds since the program started.
+  //    will overflow after 50 days.
+  if (millis() < (last_sampling_time + INTERVAL))
+    return;
+
+  distance = USS_measure(PIN_TRIG, PIN_ECHO); // read distance
+
+  // LED 밝기 제어 (active low: 0=최대, 255=꺼짐)
+  int led_value = 255; // 꺼짐이 기본
+  if (distance <= 100.0 || distance >= 300.0) {
+    led_value = 255; // 꺼짐
+  } else if ((distance > 100.0 && distance < 150.0)) {
+    // 100 ~ 150mm: 0~127 (50% 밝기까지 선형 증가)
+    led_value = map(distance, 100, 150, 255, 127);
+  } else if (distance >= 150.0 && distance < 200.0) {
+    // 150 ~ 200mm: 127~0 (최대 밝기까지 선형 증가)
+    led_value = map(distance, 150, 200, 127, 0);
+  } else if (distance >= 200.0 && distance < 250.0) {
+    // 200 ~ 250mm: 0~127 (최대 밝기에서 50% 밝기로 감소)
+    led_value = map(distance, 200, 250, 0, 127);
+  } else if (distance >= 250.0 && distance < 300.0) {
+    // 250 ~ 300mm: 127~255 (50%에서 최소 밝기로 감소)
+    led_value = map(distance, 250, 300, 127, 255);
+  }
+ analogWrite(PIN_LED, led_value);
+
+  // Serial 출력 (중간 계산값 확인용, NaN이나 inf 체크)
+  Serial.print("Distance:"); Serial.print(distance);
+  Serial.print(", LED Value:"); Serial.println(led_value);
+
+  last_sampling_time += INTERVAL;
+}
+
+// get a distance reading from USS. return value is in millimeter.
+float USS_measure(int TRIG, int ECHO)
+{
+  digitalWrite(TRIG, HIGH);
+  delayMicroseconds(PULSE_DURATION);
+  digitalWrite(TRIG, LOW);
+  
+  return pulseIn(ECHO, HIGH, TIMEOUT) * SCALE; // unit: mm
+
+  // Pulse duration to distance conversion example (target distance = 17.3m)
+  // - pulseIn(ECHO, HIGH, timeout) returns microseconds (음파의 왕복 시간)
+  // - 편도 거리 = (pulseIn() / 1,000,000) * SND_VEL / 2 (미터 단위)
+  //   mm 단위로 하려면 * 1,000이 필요 ==>  SCALE = 0.001 * 0.5 * SND_VEL
+  //
+  // - 예, pusseIn()이 100,000 이면 (= 0.1초, 왕복 거리 34.6m)
+  //        = 100,000 micro*sec * 0.001 milli/micro * 0.5 * 346 meter/sec
+  //        = 100,000 * 0.001 * 0.5 * 346
+  //        = 17,300 mm  ==> 17.3m
+}
