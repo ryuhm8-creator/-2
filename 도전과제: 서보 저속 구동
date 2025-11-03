@@ -1,0 +1,96 @@
+#include <Servo.h>
+
+// Arduino pin assignment
+#define PIN_SERVO 10
+
+// configurable parameters
+#define _DUTY_MIN 500 // servo full clock-wise position (0 degree)
+#define _DUTY_NEU 1500 // servo neutral position (90 degree)
+#define _DUTY_MAX 2400 // servo full counter-clockwise position (180 degree)
+
+#define _POS_START (_DUTY_MIN + 100)    // servo start position
+#define _POS_END   (_DUTY_MAX - 100)    // servo end position
+
+#define _SERVO_SPEED 3 // servo speed limit (unit: degree/second)
+#define INTERVAL 20     // servo update interval (unit: msec)
+
+// global variables
+unsigned long last_sampling_time; // unit: msec
+
+Servo myservo;
+
+float duty_change_per_interval;  // int -> float로 변경하여 소수점 단위 변화 저장 가능
+int duty_target;                 // target은 정수로 유지 (서보 신호는 정수)
+float duty_curr_float;           // 현재 duty를 실수로 저장하여 누적 변화 반영
+int duty_curr;                  // 서보에 전달할 정수형 현재 duty
+
+int toggle_interval, toggle_interval_cnt;  // 이 두 변수는 int 유지
+
+void setup() {
+  // initialize GPIO pins
+  myservo.attach(PIN_SERVO); 
+  
+  duty_target = duty_curr = _POS_START;
+  myservo.writeMicroseconds(duty_curr);
+  
+  // initialize serial port
+  Serial.begin(57600);
+
+  duty_change_per_interval = 
+    (_DUTY_MAX - _DUTY_MIN) * (_SERVO_SPEED / 180.0) * (INTERVAL / 1000.0);
+
+  duty_curr_float = _POS_START;   // 실수형 현재 duty 초기화
+  duty_curr = (int)duty_curr_float; // 기존 duty_curr 초기화
+  myservo.writeMicroseconds(duty_curr);
+
+  // remove 'while(1) { }' lines after modify 
+  Serial.print("duty_change_per_interval:");
+  Serial.println(duty_change_per_interval);
+  
+
+  // initialize variables for servo update.
+  toggle_interval = (180.0 / _SERVO_SPEED) * 1000 / INTERVAL;
+  toggle_interval_cnt = toggle_interval;
+  
+  // initialize last sampling time
+  last_sampling_time = 0;
+}
+
+void loop() {
+  if (millis() < (last_sampling_time + INTERVAL)) 
+    return;
+
+  if (duty_target > duty_curr_float) {
+    duty_curr_float += duty_change_per_interval;
+    if (duty_curr_float > duty_target)
+      duty_curr_float = duty_target;
+  } else {
+    duty_curr_float -= duty_change_per_interval;
+    if (duty_curr_float < duty_target)
+      duty_curr_float = duty_target;
+  }
+
+  duty_curr = (int)duty_curr_float;
+  myservo.writeMicroseconds(duty_curr);
+
+  // output the read value to the serial port
+  Serial.print("Min:1000");
+  Serial.print("duty_change_per_interval:"); Serial.print(duty_change_per_interval);
+  Serial.print(",duty_target:"); Serial.print(duty_target);
+  Serial.print(",duty_curr:");   Serial.print(duty_curr);
+  Serial.println(",Max:2000");
+
+  // toggle duty_target between _DUTY_MIN and _DUTY_MAX.
+  if (toggle_interval_cnt >= toggle_interval) {
+    toggle_interval_cnt = 0;
+    if (duty_target == _POS_START)
+      duty_target = _POS_END;
+    else
+      duty_target = _POS_START;
+  } else {
+    toggle_interval_cnt++;
+  }
+
+  // update last sampling time
+  last_sampling_time += INTERVAL;
+}
